@@ -302,6 +302,10 @@ class TP_Import_Publication_Page {
      * @since 6.0.0
      */
     public static function show_results($entries, $mode = 'history') {
+        
+        if ( !is_array($entries) ) {
+            $entries = [];
+        }
 
         // WordPress User information
         $current_user = wp_get_current_user();
@@ -406,6 +410,16 @@ class TP_Import_Publication_Page {
                         <option value="rss">RSS (2.0)</option>
                         <option value="rtf">RTF</option>
                     </select>
+                </td>
+            </tr>
+            <tr>
+                <th style="width: 150px;"><?php _e('BibTeX Additions'); ?></th>
+                <td>
+                    <input name="tp_private_comment" id="tp_private_comment" type="checkbox"/> <label for="tp_private_comment"><?php _e('Include private comments'); ?></label><br/>
+                    <?php
+                    $checked = ( get_tp_option('convert_bibtex') == '1' ) ? 'checked="checked"' : '';
+                    ?>
+                    <input name="tp_convert_bibtex" id="tp_convert_bibtex" type="checkbox" <?php echo $checked; ?> /> <label for="tp_convert_bibtex"><?php _e('Try to convert utf-8 chars into BibTeX compatible ASCII strings'); ?></label>
                 </td>
             </tr>
         </table>

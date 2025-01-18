@@ -217,7 +217,7 @@ class TP_Publication_Template_API {
     public function get_type($container = 'span') {
         $type = $this->data['row']['type'];
         if ( $container !== '' ) {
-            return '<' . $container . ' class="tp_pub_type ' . $type . '">' . tp_translate_pub_type($type) . '</' . $container . '>';
+            return '<' . $container . ' class="tp_pub_type tp_  ' . $type . '">' . tp_translate_pub_type($type) . '</' . $container . '>';
         }
         return $type;
     }
@@ -364,6 +364,11 @@ class TP_Publication_Template_API {
             $content .= TP_HTML_Publication_Template::get_info_container( TP_HTML_Publication_Template::prepare_plumx( $row['doi'] ), 'plumx', $container_id );
         }
 
+	// div comment
+	if ( $settings['show_comment'] && $row['comment'] != '' ) {
+            $content .= TP_HTML_Publication_Template::get_info_container( TP_HTML::prepare_text($row['comment']), 'comment', $container_id );
+	}
+
         // div bibtex
         $content .= TP_HTML_Publication_Template::get_info_container( nl2br( TP_Bibtex::get_single_publication_bibtex($row, $keywords, $settings['convert_bibtex']) ), 'bibtex', $container_id );
 
@@ -433,6 +438,7 @@ class TP_HTML_Publication_Template {
         $settings['meta_label_in'] = $template_settings['meta_label_in'];
         $tag_string = '';
         $keywords = '';
+        $comment = '';
         $all_authors = '';
         $is_button = false;
         $altmetric = '';
@@ -472,6 +478,14 @@ class TP_HTML_Publication_Template {
             $is_button = true;
         }
 
+        // Comment
+        if ( $settings['show_comment'] && $row['comment'] != '' ) {
+            $link_text = ( $settings['comment_text'] != '' ) ? $settings['comment_text'] : __('Comment', 'teachpress');
+            $link_tooltip = ( $settings['comment_tooltip'] != '' ) ? $settings['comment_tooltip'] : __('Show comment', 'teachpress');
+            $comment = self::get_info_button($link_text, $link_tooltip, 'comment', $container_id) . $separator;
+            $is_button = true;
+        }
+
         // if there is an abstract
         if ( $row['abstract'] != '' ) {
             $abstract = self::get_info_button(__('Abstract','teachpress'), __('Show abstract','teachpress'), 'abstract', $container_id) . $separator;
@@ -497,10 +511,10 @@ class TP_HTML_Publication_Template {
 
         // link style
         if ( $settings['link_style'] === 'inline' || $settings['link_style'] === 'direct' ) {
-            $tag_string = $abstract . $url . $bibtex . $altmetric . $dimensions . $plumx. $tag_string ;
+            $tag_string = $comment . $abstract . $url . $bibtex . $altmetric . $dimensions . $plumx. $tag_string ;
         }
         else {
-            $tag_string = $abstract . $bibtex . $altmetric . $dimensions . $plumx . $tag_string . $url ;
+            $tag_string = $comment . $abstract . $bibtex . $altmetric . $dimensions . $plumx . $tag_string . $url ;
         }
 
         // load template interface

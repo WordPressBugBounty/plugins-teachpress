@@ -70,8 +70,20 @@ class TP_Shortcodes {
             // Use the visible filter o the SQL parameter
             $author_id = ($filter_parameter['show_in_author_filter'] !== '') ? $filter_parameter['show_in_author_filter'] : $filter_parameter['author_preselect'];
 
+            $author_ids = '';
+            $author_names = '';
+            $authors = explode(",", $author_id);
+            foreach ( $authors as $author ) {
+                if ( ctype_digit($author) ) {
+                    $author_ids .= $author . ',';
+                } else {
+                    $author_names .= $author . ',';
+                }
+            }
+
             $row = TP_Authors::get_authors( array( 'user'           => $sql_parameter['user'],
-                                                   'author_id'      => $author_id,
+                                                   'author'         => $author_names,
+                                                   'author_id'      => $author_ids,
                                                    'output_type'    => ARRAY_A,
                                                    'group_by'       => true ) );
             $defaults['url_slug'] = 'auth';
@@ -904,7 +916,7 @@ function tp_ref_shortcode($atts) {
  */
 function tp_single_shortcode ($atts) {
     global $tp_single_publication;
-    $param = shortcode_atts(array(
+    $param = shortcode_atts([
        'id'                 => 0,
        'key'                => '',
        'author_name'        => 'simple',
@@ -916,9 +928,9 @@ function tp_single_shortcode ($atts) {
        'image_size'         => 0,
        'meta_label_in'      => __('In','teachpress') . ': ',
        'link'               => ''
-    ), $atts);
+    ], $atts);
 
-    $settings = array(
+    $settings = [
        'author_name'        => htmlspecialchars($param['author_name']),
        'editor_name'        => htmlspecialchars($param['editor_name']),
        'author_separator'   => htmlspecialchars($param['author_separator']),
@@ -927,7 +939,7 @@ function tp_single_shortcode ($atts) {
        'style'              => 'simple',
        'meta_label_in'      => htmlspecialchars($param['meta_label_in']),
        'use_span'           => true
-    );
+    ];
 
     // Set publication
     if ( $param['key'] != '' ) {
@@ -937,6 +949,11 @@ function tp_single_shortcode ($atts) {
         $publication = TP_Publications::get_publication($param['id'], ARRAY_A);
     }
     $tp_single_publication = $publication;
+    
+    // Return if there os no publication
+    if ( !is_array($publication ) ) {
+        return;
+    }
 
     // Set author name
     if ( $publication['type'] === 'collection' || $publication['type'] === 'periodical' || ( $publication['author'] === '' && $publication['editor'] !== '' ) ) {
@@ -993,6 +1010,11 @@ function tp_bibtex_shortcode ($atts) {
 
     $convert_bibtex = ( get_tp_option('convert_bibtex') == '1' ) ? true : false;
     $publication = TP_Shortcodes::set_publication($param, $tp_single_publication);
+    
+    // Return if there os no publication
+    if ( !is_array($publication ) ) {
+        return;
+    }
 
     $tags = TP_Tags::get_tags( array('pub_id' => $publication['pub_id'], 'output_type' => ARRAY_A) );
 
@@ -1055,6 +1077,7 @@ function tp_links_shortcode ($atts) {
 
 /**
  * General interface for [tpcloud], [tplist] and [tpsearch]
+
  *
  * Parameters from $_GET:
  *      $yr (INT)               Year
@@ -1069,10 +1092,11 @@ function tp_links_shortcode ($atts) {
  *      @type string user                  the WordPress IDs or login names of on or more users (separated by commas)
  *      @type string tag                   tag IDs (separated by comma)
  *      @type string type                  the publication types you want to show (separated by comma)
- *      @type string author                author IDs (separated by comma)
+ *      @type string author                author IDs or names (separated by comma). If the entry is numeric then it is interpreted as an ID, otherwise as an author name.
  *      @type string year                  one or more years (separated by comma)
  *      @type string exclude               one or more IDs of publications you don't want to show (separated by comma)
  *      @type string include               one or more IDs of publications you want to show (separated by comma)
+ *      @type string meta_keys             Meta keys array, in the format "key1=value1;key2=value2;...", where each "value" may be a comma-separated string
  *      @type string include_editor_as_author  0 (false) or 1 (true), default: 1
  *      @type string order                 title, year, bibtex or type, default: date DESC
  *      @type int headline                 show headlines with years(1), with publication types(2), with years and types (3), with types and years (4) or not(0), default: 1
@@ -1105,6 +1129,9 @@ function tp_links_shortcode ($atts) {
  *      @type int show_search_filter       0 (false) or 1 (true), default: 1
  *      @type int show_year_filter         0 (false) or 1 (true), default: 1
  *      @type int show_bibtex              Show bibtex container under each entry (1) or not (0), default: 1
+ *      @type int show_comment             Show comment as a container, default: 0
+ *      @type string comment_text          Sets the text used for the comment link, if shown. Default: 'Comment'
+ *      @type string comment_tooltip       Set the tooltip text for the comment link, if shown. Default: 'Show comment'
  *      @type string container_suffix      a suffix which can optionally set to modify container IDs in publication lists. It's not set by default.
  *      @type string filter_class          The CSS class for filter/select menus, default: default
  *      @type int show_altmetric_donut     0 (false) or 1 (true), default: 0
@@ -1128,6 +1155,7 @@ function tp_publist_shortcode ($args) {
         'years_between'         => '',
         'exclude'               => '',
         'include'               => '',
+        'meta_keys'             => '',
         'include_editor_as_author' => 1,
         'order'                 => 'date DESC',
         'headline'              => 1,
@@ -1161,6 +1189,9 @@ function tp_publist_shortcode ($args) {
         'show_search_filter'    => 1,
         'show_year_filter'      => 1,
         'show_bibtex'           => 1,
+        'show_comment'          => 0,
+        'comment_text'          => '',
+        'comment_tooltip'       => '',
         'container_suffix'      => '',
         'filter_class'          => 'default',
         'custom_filter'         => '',
@@ -1198,6 +1229,9 @@ function tp_publist_shortcode ($args) {
         'show_year_filter'      => ( $atts['show_year_filter'] == '1' ) ? true : false,
         'show_search_filter'    => ( $atts['show_search_filter'] == '1' ) ? true : false,
         'show_bibtex'           => ( $atts['show_bibtex'] == '1' ) ? true : false,
+        'show_comment'          => ( $atts['show_comment'] == '1') ? true : false,
+        'comment_text'          => htmlspecialchars($atts['comment_text']),
+        'comment_tooltip'       => htmlspecialchars($atts['comment_tooltip']),
         'show_tags_as'          => htmlspecialchars($atts['show_tags_as']),
         'tag_limit'             => intval($atts['tag_limit']),
         'hide_tags'             => htmlspecialchars($atts['hide_tags']),
@@ -1257,6 +1291,23 @@ function tp_publist_shortcode ($args) {
 
     // Add values for custom filters
     $meta_key_search = [];
+
+    if ( $atts['meta_keys'] !== '' ) {
+        $meta_kvs = explode( ";", htmlspecialchars($atts['meta_keys']) );
+        foreach ( $meta_kvs as $meta_kv ) {
+            // skips the iteration if there is no "=" or if it's the first char
+            if ( !strpos($meta_kv, '=') ) {
+                continue;
+            }
+            $parts = explode( "=", $meta_kv );
+            if ( $parts[1] !== '' ) {
+                $k = $parts[0];
+                $v = $parts[1];
+                $sql_parameter[$k] = $filter_parameter[$k] = $meta_key_search[$k] = $v;
+            }
+        }
+    }
+
     if ( $settings['custom_filter'] !== '' ) {
         $custom_fields = explode(',', $settings['custom_filter']);
         foreach ( $custom_fields as $field ) {
@@ -1398,6 +1449,18 @@ function tp_publist_shortcode ($args) {
         $sql_parameter['order'] = "year DESC, type ASC, date DESC";
     }
 
+    // Separate authors names from authors IDs
+    $author_ids = '';
+    $author_names = '';
+    $authors = explode(",", $sql_parameter['author']);
+    foreach ( $authors as $author ) {
+        if ( ctype_digit($author) ) {
+            $author_ids .= $author . ',';
+        } else {
+            $author_names .= $author . ',';
+        }
+    }
+
     // Parameters for returning publications
     $args = array(
         'tag'                       => $sql_parameter['tag'],
@@ -1407,7 +1470,8 @@ function tp_publist_shortcode ($args) {
         'type'                      => $sql_parameter['type'],
         'user'                      => $sql_parameter['user'],
         'search'                    => $filter_parameter['search'],
-        'author_id'                 => $sql_parameter['author'],
+        'author'                    => $author_names,
+        'author_id'                 => $author_ids,
         'order'                     => $sql_parameter['order'],
         'exclude'                   => $sql_parameter['exclude'],
         'exclude_tags'              => $sql_parameter['exclude_tags'],
@@ -1534,6 +1598,7 @@ function tp_cloud_shortcode($atts) {
         'years_between'             => '',
         'exclude'                   => '',
         'include'                   => '',
+        'meta_keys'                 => '',
         'include_editor_as_author'  => 1,
         'order'                     => 'date DESC',
         'headline'                  => 1,
@@ -1567,6 +1632,9 @@ function tp_cloud_shortcode($atts) {
         'show_search_filter'        => 0,
         'show_year_filter'          => 1,
         'show_bibtex'               => 1,
+        'show_comment'              => 0,
+        'comment_text'              => '',
+        'comment_tooltip'           => '',
         'container_suffix'          => '',
         'show_altmetric_donut'      => 0,
         'show_altmetric_entry'      => 0,
@@ -1602,6 +1670,7 @@ function tp_list_shortcode($atts){
        'years_between'              => '',
        'exclude'                    => '',
        'include'                    => '',
+       'meta_keys'                  => '',
        'include_editor_as_author'   => 1,
        'exclude_tags'               => '',
        'exclude_types'              => '',
@@ -1624,6 +1693,9 @@ function tp_list_shortcode($atts){
        'entries_per_page'           => 50,
        'sort_list'                  => '',
        'show_bibtex'                => 1,
+       'show_comment'               => 0,
+       'comment_text'               => '',
+       'comment_tooltip'            => '',
        'show_type_filter'           => 0,
        'show_author_filter'         => 0,
        'show_in_author_filter'      => '',
@@ -1663,6 +1735,7 @@ function tp_search_shortcode ($atts) {
        'years_between'              => '',
        'exclude'                    => '',
        'include'                    => '',
+       'meta_keys'                  => '',
        'include_editor_as_author'   => 1,
        'order'                      => 'date DESC',
        'headline'                   => 0,
@@ -1685,6 +1758,9 @@ function tp_search_shortcode ($atts) {
        'entries_per_page'           => 20,
        'sort_list'                  => '',
        'show_bibtex'                => 1,
+       'show_comment'               => 0,
+       'comment_text'               => '',
+       'comment_tooltip'            => '',
        'show_tags_as'               => 'none',
        'show_author_filter'         => 0,
        'show_in_author_filter'      => '',
